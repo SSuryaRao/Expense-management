@@ -1,3 +1,19 @@
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 export type Country = {
   name: {
     common: string;
@@ -49,16 +65,37 @@ export async function simulateOCR(file: File): Promise<{
   date: string;
   merchant: string;
 }> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        amount: Math.floor(Math.random() * 500) + 10,
-        currency: 'USD',
-        category: ['Travel', 'Food', 'Supplies', 'Entertainment'][Math.floor(Math.random() * 4)],
-        description: 'Auto-generated from receipt',
-        date: new Date().toISOString().split('T')[0],
-        merchant: 'Sample Merchant',
-      });
-    }, 2000);
-  });
+  try {
+    // Send file to backend for OCR processing
+    const formData = new FormData();
+    formData.append('receipt', file);
+
+    const { data } = await api.post('/ocr', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log('Backend OCR Result:', data);
+
+    return {
+      amount: data.amount || 0,
+      currency: data.currency || 'USD',
+      category: data.category || '',
+      description: data.description || '',
+      date: data.date || new Date().toISOString().split('T')[0],
+      merchant: data.merchant || '',
+    };
+  } catch (error) {
+    console.error('OCR Error:', error);
+    // Fallback to empty data if OCR fails
+    return {
+      amount: 0,
+      currency: 'USD',
+      category: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+      merchant: '',
+    };
+  }
 }

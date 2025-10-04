@@ -1,9 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Type definitions for the application
+// This file previously used Supabase but now uses the backend API
 
 export type Profile = {
   id: string;

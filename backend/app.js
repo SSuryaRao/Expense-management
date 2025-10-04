@@ -11,7 +11,8 @@ app.use(cors());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
-app.use('/api/workflows', require('./routes/workflowRoutes')); // Add this line
+app.use('/api/workflows', require('./routes/workflowRoutes'));
+app.use('/api/ocr', require('./routes/ocrRoutes'));
 
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Company = require('../models/Company');
+const ApprovalWorkflow = require('../models/ApprovalWorkflow');
 const generateToken = require('../utils/generateToken');
 const axios = require('axios');
 
@@ -23,7 +24,14 @@ exports.signup = async (req, res) => {
         // 2. Create the company
         const company = await Company.create({ name: companyName, defaultCurrency: currencyCode });
 
-        // 3. Create the admin user for this company
+        // 3. Create a default approval workflow for the company
+        await ApprovalWorkflow.create({
+            companyId: company._id,
+            name: 'Default Workflow',
+            description: 'Default approval workflow for all expenses',
+        });
+
+        // 4. Create the admin user for this company
         const user = await User.create({
             name,
             email,
@@ -32,7 +40,7 @@ exports.signup = async (req, res) => {
             companyId: company._id,
         });
 
-        // 4. Send back user details and token
+        // 5. Send back user details and token
         res.status(201).json({
             _id: user._id,
             name: user.name,

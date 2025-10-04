@@ -1,6 +1,7 @@
 const Expense = require('../models/Expense');
 const Company = require('../models/Company');
 const ApprovalWorkflow = require('../models/ApprovalWorkflow');
+const User = require('../models/User');
 const axios = require('axios');
 
 // @desc    Create a new expense

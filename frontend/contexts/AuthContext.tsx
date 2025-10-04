@@ -1,136 +1,148 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase, Profile, Company } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 
-type AuthContextType = {
+// Define the types for your user and company based on your backend models
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'Admin' | 'Manager' | 'Employee';
+  companyId: string;
+  managerId?: string;
+}
+
+interface Company {
+    _id: string;
+    name: string;
+    defaultCurrency: string;
+}
+
+interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  profile?: User | null;
   company: Company | null;
   loading: boolean;
+  token: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, companyName: string, country: string, currency: string) => Promise<void>;
-  signOut: () => Promise<void>;
-};
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+    companyName: string,
+    country: string
+  ) => Promise<void>;
+  signOut: () => void;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+// Create an Axios instance for your API
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-
-      setLoading(false);
-    })();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setCompany(null);
+    const loadUserFromStorage = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        setToken(storedToken);
+        try {
+          // Fetch user and company details from /me endpoint
+          const { data } = await api.get('/users/me');
+          setUser(data.user);
+          setCompany(data.company);
+        } catch (error) {
+          console.error('Failed to load user from token', error);
+          localStorage.removeItem('token');
         }
-      })();
-    });
+      }
+      setLoading(false);
+    };
 
-    return () => subscription.unsubscribe();
+    loadUserFromStorage();
   }, []);
 
-  const fetchProfile = async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profileData) {
-      setProfile(profileData);
-
-      const { data: companyData } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', profileData.company_id)
-        .maybeSingle();
-
-      setCompany(companyData);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data } = await api.post('/auth/login', { email, password });
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
 
-    if (error) throw error;
+    // Fetch full user and company details
+    try {
+      const { data: meData } = await api.get('/users/me');
+      setUser(meData.user);
+      setCompany(meData.company);
+    } catch (error) {
+      console.error('Failed to load user/company details:', error);
+    }
+
+    if (data.role === 'Admin') {
+      router.push('/admin');
+    } else if (data.role === 'Manager') {
+        router.push('/manager/approvals');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const signUp = async (
+    name: string,
     email: string,
     password: string,
     companyName: string,
-    country: string,
-    currency: string
+    country: string
   ) => {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data } = await api.post('/auth/signup', {
+      name,
       email,
       password,
+      companyName,
+      country,
     });
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
 
-    if (authError) throw authError;
-
-    if (authData.user) {
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: companyName,
-          country,
-          default_currency: currency,
-        })
-        .select()
-        .single();
-
-      if (companyError) throw companyError;
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          company_id: companyData.id,
-          email,
-          role: 'admin',
-        });
-
-      if (profileError) throw profileError;
+    // Fetch full user and company details
+    try {
+      const { data: meData } = await api.get('/users/me');
+      setUser(meData.user);
+      setCompany(meData.company);
+    } catch (error) {
+      console.error('Failed to load user/company details:', error);
     }
+
+    router.push('/admin');
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = () => {
+    localStorage.removeItem('token');
+    setToken(null);
     setUser(null);
-    setProfile(null);
     setCompany(null);
     router.push('/');
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, company, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, profile: user, company, loading, token, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

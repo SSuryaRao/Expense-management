@@ -7,9 +7,24 @@ import { Button } from '@/components/ui/button';
 import { ExpenseTable } from '@/components/ExpenseTable';
 import { NewExpenseModal } from '@/components/NewExpenseModal';
 import { ExpenseDetailModal } from '@/components/ExpenseDetailModal';
-import { supabase, Expense, ExpenseApproval } from '@/lib/supabase';
+import { Expense, ExpenseApproval } from '@/lib/supabase'; // Keep these types for now
 import { Plus, LogOut, Loader as Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
+
+// Create an Axios instance for your API
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 
 export default function EmployeeDashboard() {
   const { user, profile, company, signOut } = useAuth();
@@ -23,37 +38,22 @@ export default function EmployeeDashboard() {
   const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/');
-      return;
-    }
-
-    if (profile && profile.role !== 'employee') {
-      if (profile.role === 'admin') {
-        router.push('/admin');
-      } else if (profile.role === 'manager') {
-        router.push('/manager/approvals');
-      }
-    }
-  }, [user, profile, router]);
+    useEffect(() => {
+        if (!user) {
+            router.push('/');
+        }
+    }, [user, router]);
 
   useEffect(() => {
-    if (user && profile?.role === 'employee') {
+    if (user) {
       loadExpenses();
     }
-  }, [user, profile]);
+  }, [user]);
 
   const loadExpenses = async () => {
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('employee_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setExpenses(data || []);
+      const { data } = await api.get('/expenses/my');
+      setExpenses(data);
     } catch (error) {
       console.error('Failed to load expenses:', error);
       toast({
@@ -68,36 +68,10 @@ export default function EmployeeDashboard() {
 
   const handleExpenseClick = async (expense: Expense) => {
     setSelectedExpense(expense);
-
-    try {
-      const { data: approvalsData } = await supabase
-        .from('expense_approvals')
-        .select('*')
-        .eq('expense_id', expense.id)
-        .order('step_order', { ascending: true });
-
-      if (approvalsData) {
-        setApprovals(approvalsData);
-
-        const approverIds = Array.from(new Set(approvalsData.map((a) => a.approver_id)));
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .in('id', approverIds);
-
-        if (profilesData) {
-          const names: { [key: string]: string } = {};
-          profilesData.forEach((p) => {
-            names[p.id] = p.email;
-          });
-          setApproverNames(names);
-        }
-      }
-
-      setDetailOpen(true);
-    } catch (error) {
-      console.error('Failed to load approvals:', error);
-    }
+    // You'll need to implement logic to fetch approval details from your backend
+    setApprovals([]);
+    setApproverNames({});
+    setDetailOpen(true);
   };
 
   const handleNewExpense = async (expenseData: {
@@ -106,56 +80,22 @@ export default function EmployeeDashboard() {
     category: string;
     description: string;
     expense_date: string;
+    receipt: File;
   }) => {
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .insert({
-          company_id: profile?.company_id,
-          employee_id: user?.id,
-          ...expenseData,
-          status: 'pending',
-        })
-        .select()
-        .single();
+        const formData = new FormData();
+        formData.append('originalAmount', expenseData.amount.toString());
+        formData.append('originalCurrency', expenseData.currency);
+        formData.append('category', expenseData.category);
+        formData.append('description', expenseData.description);
+        formData.append('receipt', expenseData.receipt);
 
-      if (error) throw error;
 
-      if (data) {
-        const { data: ruleData } = await supabase
-          .from('approval_rules')
-          .select('*, approval_steps(*)')
-          .eq('company_id', profile?.company_id)
-          .maybeSingle();
-
-        if (ruleData) {
-          const approvalRecords = [];
-
-          if (ruleData.is_manager_approver && profile?.manager_id) {
-            approvalRecords.push({
-              expense_id: data.id,
-              approver_id: profile.manager_id,
-              step_order: 0,
-              status: 'pending',
-            });
-          }
-
-          if (ruleData.approval_steps) {
-            for (const step of ruleData.approval_steps) {
-              approvalRecords.push({
-                expense_id: data.id,
-                approver_id: step.approver_id,
-                step_order: step.step_order + (ruleData.is_manager_approver ? 1 : 0),
-                status: ruleData.is_manager_approver || step.step_order > 1 ? 'waiting' : 'pending',
-              });
-            }
-          }
-
-          if (approvalRecords.length > 0) {
-            await supabase.from('expense_approvals').insert(approvalRecords);
-          }
-        }
-      }
+      await api.post('/expenses', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+      });
 
       toast({
         title: 'Success',
@@ -167,20 +107,21 @@ export default function EmployeeDashboard() {
       console.error('Failed to submit expense:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit expense',
+        description: error.response?.data?.message || 'Failed to submit expense',
         variant: 'destructive',
       });
       throw error;
     }
   };
 
-  if (loading || !profile || !company) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-black">
@@ -189,7 +130,7 @@ export default function EmployeeDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">My Expenses</h1>
-              <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
+              <p className="text-sm text-gray-400 mt-1">{user.email}</p>
             </div>
             <Button
               onClick={signOut}
@@ -206,8 +147,7 @@ export default function EmployeeDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <p className="text-gray-400 text-sm">Default Currency</p>
-            <p className="text-white font-medium">{company.default_currency}</p>
+            {/* You may want to fetch and display company currency here */}
           </div>
           <Button
             onClick={() => setNewExpenseOpen(true)}
@@ -225,7 +165,7 @@ export default function EmployeeDashboard() {
         open={newExpenseOpen}
         onOpenChange={setNewExpenseOpen}
         onSubmit={handleNewExpense}
-        defaultCurrency={company.default_currency}
+        defaultCurrency={company?.defaultCurrency || 'USD'}
       />
 
       <ExpenseDetailModal
@@ -238,3 +178,4 @@ export default function EmployeeDashboard() {
     </div>
   );
 }
+

@@ -15,11 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader as Loader2, TrendingUp } from 'lucide-react';
+import { Loader2, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { fetchCountriesAndCurrencies, Country } from '@/services/api';
 
 export default function SignupPage() {
+  const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,16 +76,15 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await signUp(email, password, companyName, country, currency);
+      await signUp(name, email, password, companyName, country);
       toast({
         title: 'Success',
         description: 'Account created successfully',
       });
-      router.push('/admin');
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create account',
+        description: error.response?.data?.message || 'Failed to create account',
         variant: 'destructive',
       });
     } finally {
@@ -109,6 +109,21 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+               <div className="space-y-2">
+                <Label htmlFor="name" className="text-gray-300">
+                  Your Name
+                </Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="bg-gray-900 border-gray-800 text-white placeholder:text-gray-500"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="companyName" className="text-gray-300">
                   Company Name

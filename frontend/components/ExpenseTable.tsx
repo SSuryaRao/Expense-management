@@ -63,29 +63,30 @@ export function ExpenseTable<T extends Expense = Expense>({
           ) : (
             expenses.map((expense) => (
               <TableRow
-                key={expense.id}
+                key={(expense as any)._id || expense.id}
                 className="border-gray-800 hover:bg-gray-900 cursor-pointer"
                 onClick={() => onExpenseClick?.(expense)}
               >
                 {showEmployee && (
                   <TableCell className="text-gray-300">
-                    {employeeNames[expense.employee_id] || 'Unknown'}
+                    {employeeNames[(expense as any).submittedBy || expense.employee_id] || 'Unknown'}
                   </TableCell>
                 )}
                 <TableCell className="text-gray-300">
-                  {new Date(expense.expense_date).toLocaleDateString()}
+                  {new Date((expense as any).submissionDate || expense.expense_date).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-gray-300">{expense.category}</TableCell>
                 <TableCell className="text-gray-300 max-w-xs truncate">
                   {expense.description}
                 </TableCell>
                 <TableCell>
-                  <Badge className={`${getStatusColor(expense.status)} capitalize`}>
+                  <Badge className={`${getStatusColor(expense.status.toLowerCase())} capitalize`}>
                     {expense.status}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-gray-300 text-right font-medium">
-                  {expense.currency} {expense.amount.toFixed(2)}
+                  {(expense as any).companyCurrency || expense.currency}{' '}
+                  {(parseFloat((expense as any).convertedAmount?.$numberDecimal || (expense as any).convertedAmount || expense.amount || '0')).toFixed(2)}
                 </TableCell>
               </TableRow>
             ))

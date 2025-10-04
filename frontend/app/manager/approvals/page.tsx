@@ -1,30 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LogOut, Loader2, CheckCircle, X } from 'lucide-react';
 import { ExpenseTable } from '@/components/ExpenseTable';
-import { ApprovalModal } from '@/components/ApprovalModal';
-import { supabase, Expense, ExpenseApproval } from '@/lib/supabase';
-import { LogOut, Loader as Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { convertCurrency } from '@/services/api';
+import axios from 'axios';
 
-type ExpenseWithApproval = Expense & {
-  approval: ExpenseApproval;
-};
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export default function ManagerApprovalsPage() {
-  const { user, profile, company, signOut } = useAuth();
-  const [expenses, setExpenses] = useState<ExpenseWithApproval[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [approvalOpen, setApprovalOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<ExpenseWithApproval | null>(null);
-  const [convertedAmount, setConvertedAmount] = useState<number | undefined>();
-  const [employeeNames, setEmployeeNames] = useState<{ [key: string]: string }>({});
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [selectedExpense, setSelectedExpense] = useState<any | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [comment, setComment] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -32,66 +41,24 @@ export default function ManagerApprovalsPage() {
       return;
     }
 
-    if (profile && profile.role === 'employee') {
+    if (user.role === 'Employee') {
       router.push('/dashboard');
-    } else if (profile && profile.role === 'admin') {
+    } else if (user.role === 'Admin') {
       router.push('/admin');
+    } else {
+      loadPendingExpenses();
     }
-  }, [user, profile, router]);
+  }, [user, router]);
 
-  useEffect(() => {
-    if (user && profile?.role === 'manager') {
-      loadPendingApprovals();
-    }
-  }, [user, profile]);
-
-  const loadPendingApprovals = async () => {
+  const loadPendingExpenses = async () => {
     try {
-      const { data: approvalsData, error: approvalsError } = await supabase
-        .from('expense_approvals')
-        .select('*, expenses(*)')
-        .eq('approver_id', user?.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (approvalsError) throw approvalsError;
-
-      if (approvalsData) {
-        const expensesWithApprovals: ExpenseWithApproval[] = approvalsData.map((approval: any) => ({
-          ...approval.expenses,
-          approval: {
-            id: approval.id,
-            expense_id: approval.expense_id,
-            approver_id: approval.approver_id,
-            step_order: approval.step_order,
-            status: approval.status,
-            comments: approval.comments,
-            action_date: approval.action_date,
-            created_at: approval.created_at,
-          },
-        }));
-
-        setExpenses(expensesWithApprovals);
-
-        const employeeIds = Array.from(new Set(expensesWithApprovals.map((e) => e.employee_id)));
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .in('id', employeeIds);
-
-        if (profilesData) {
-          const names: { [key: string]: string } = {};
-          profilesData.forEach((p) => {
-            names[p.id] = p.email;
-          });
-          setEmployeeNames(names);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load approvals:', error);
+      const { data } = await api.get('/expenses/pending');
+      setExpenses(data);
+    } catch (error: any) {
+      console.error('Failed to load pending expenses:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load pending approvals',
+        description: error.response?.data?.message || 'Failed to load pending expenses',
         variant: 'destructive',
       });
     } finally {
@@ -99,146 +66,37 @@ export default function ManagerApprovalsPage() {
     }
   };
 
-  const handleExpenseClick = async (expense: ExpenseWithApproval) => {
-    setSelectedExpense(expense);
+  const handleAction = async (action: 'Approved' | 'Rejected') => {
+    if (!selectedExpense) return;
 
-    if (company && expense.currency !== company.default_currency) {
-      try {
-        const converted = await convertCurrency(
-          expense.amount,
-          expense.currency,
-          company.default_currency
-        );
-        setConvertedAmount(converted);
-      } catch (error) {
-        console.error('Failed to convert currency:', error);
-        setConvertedAmount(undefined);
-      }
-    } else {
-      setConvertedAmount(undefined);
-    }
-
-    setApprovalOpen(true);
-  };
-
-  const handleApprove = async (expenseId: string, comments: string) => {
+    setActionLoading(true);
     try {
-      const expense = expenses.find((e) => e.id === expenseId);
-      if (!expense) return;
-
-      await supabase
-        .from('expense_approvals')
-        .update({
-          status: 'approved',
-          comments,
-          action_date: new Date().toISOString(),
-        })
-        .eq('id', expense.approval.id);
-
-      const { data: allApprovals } = await supabase
-        .from('expense_approvals')
-        .select('*')
-        .eq('expense_id', expenseId)
-        .order('step_order', { ascending: true });
-
-      if (allApprovals) {
-        const currentIndex = allApprovals.findIndex((a) => a.id === expense.approval.id);
-        const nextApproval = allApprovals[currentIndex + 1];
-
-        if (nextApproval && nextApproval.status === 'waiting') {
-          await supabase
-            .from('expense_approvals')
-            .update({ status: 'pending' })
-            .eq('id', nextApproval.id);
-        } else if (!nextApproval) {
-          const { data: ruleData } = await supabase
-            .from('approval_rules')
-            .select('*')
-            .eq('company_id', profile?.company_id)
-            .maybeSingle();
-
-          let finalStatus = 'approved';
-
-          if (ruleData?.rule_type) {
-            const approvedCount = allApprovals.filter((a) => a.status === 'approved').length + 1;
-            const totalCount = allApprovals.length;
-
-            if (ruleData.rule_type === 'percentage' && ruleData.percentage_required) {
-              const percentage = (approvedCount / totalCount) * 100;
-              if (percentage < ruleData.percentage_required) {
-                finalStatus = 'pending';
-              }
-            } else if (ruleData.rule_type === 'specific_approver') {
-              if (user?.id !== ruleData.specific_approver_id) {
-                finalStatus = 'pending';
-              }
-            } else if (ruleData.rule_type === 'hybrid') {
-              const percentage = (approvedCount / totalCount) * 100;
-              const percentageMet =
-                ruleData.percentage_required && percentage >= ruleData.percentage_required;
-              const specificApproverMet = user?.id === ruleData.specific_approver_id;
-
-              if (!percentageMet && !specificApproverMet) {
-                finalStatus = 'pending';
-              }
-            }
-          }
-
-          await supabase.from('expenses').update({ status: finalStatus }).eq('id', expenseId);
-        }
-      }
+      await api.put(`/expenses/${selectedExpense._id}/action`, {
+        action,
+        comment,
+      });
 
       toast({
         title: 'Success',
-        description: 'Expense approved successfully',
+        description: `Expense ${action.toLowerCase()} successfully`,
       });
 
-      loadPendingApprovals();
+      setSelectedExpense(null);
+      setComment('');
+      loadPendingExpenses();
     } catch (error: any) {
-      console.error('Failed to approve expense:', error);
+      console.error('Failed to process action:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to approve expense',
+        description: error.response?.data?.message || 'Failed to process action',
         variant: 'destructive',
       });
-      throw error;
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleReject = async (expenseId: string, comments: string) => {
-    try {
-      const expense = expenses.find((e) => e.id === expenseId);
-      if (!expense) return;
-
-      await supabase
-        .from('expense_approvals')
-        .update({
-          status: 'rejected',
-          comments,
-          action_date: new Date().toISOString(),
-        })
-        .eq('id', expense.approval.id);
-
-      await supabase.from('expenses').update({ status: 'rejected' }).eq('id', expenseId);
-
-      toast({
-        title: 'Success',
-        description: 'Expense rejected',
-      });
-
-      loadPendingApprovals();
-    } catch (error: any) {
-      console.error('Failed to reject expense:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to reject expense',
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  };
-
-  if (loading || !profile || !company) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -252,8 +110,8 @@ export default function ManagerApprovalsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">Pending Approvals</h1>
-              <p className="text-sm text-gray-400 mt-1">{profile.email}</p>
+              <h1 className="text-2xl font-bold text-white">Approvals</h1>
+              <p className="text-sm text-gray-400 mt-1">{user.email}</p>
             </div>
             <Button
               onClick={signOut}
@@ -268,34 +126,198 @@ export default function ManagerApprovalsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <p className="text-gray-400 text-sm">Company Currency</p>
-          <p className="text-white font-medium">{company.default_currency}</p>
-        </div>
+        <Card className="bg-gray-950 border-gray-800">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-6 w-6 text-blue-500" />
+                <div>
+                  <CardTitle className="text-white">Expense Approvals</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Review and approve pending expense submissions
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="text-sm text-gray-400">
+                {expenses.length} pending approval{expenses.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-gray-800 overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-900">
+                      <tr className="border-b border-gray-800">
+                        <th className="text-left text-gray-400 font-medium p-3">Employee</th>
+                        <th className="text-left text-gray-400 font-medium p-3">Date</th>
+                        <th className="text-left text-gray-400 font-medium p-3">Category</th>
+                        <th className="text-left text-gray-400 font-medium p-3">Description</th>
+                        <th className="text-left text-gray-400 font-medium p-3">Status</th>
+                        <th className="text-right text-gray-400 font-medium p-3">Amount</th>
+                        <th className="text-right text-gray-400 font-medium p-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenses.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center text-gray-500 py-8">
+                            No pending expenses
+                          </td>
+                        </tr>
+                      ) : (
+                        expenses.map((expense) => (
+                          <tr key={expense._id} className="border-b border-gray-800 hover:bg-gray-900">
+                            <td className="text-gray-300 p-3">
+                              {expense.submittedBy?.name || expense.submittedBy?.email || 'Unknown'}
+                            </td>
+                            <td className="text-gray-300 p-3">
+                              {new Date(expense.submissionDate).toLocaleDateString()}
+                            </td>
+                            <td className="text-gray-300 p-3">{expense.category}</td>
+                            <td className="text-gray-300 p-3 max-w-xs truncate">
+                              {expense.description}
+                            </td>
+                            <td className="p-3">
+                              <span className="inline-block px-2 py-1 text-xs rounded bg-yellow-600 capitalize">
+                                {expense.status}
+                              </span>
+                            </td>
+                            <td className="text-gray-300 text-right font-medium p-3">
+                              {expense.companyCurrency}{' '}
+                              {parseFloat(expense.convertedAmount?.$numberDecimal || expense.convertedAmount || '0').toFixed(2)}
+                            </td>
+                            <td className="text-right p-3">
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => setSelectedExpense(expense)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-xs"
+                                >
+                                  Review
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {expenses.length === 0 ? (
-          <div className="text-center py-12 bg-gray-950 rounded-lg border border-gray-800">
-            <p className="text-gray-400">No pending approvals</p>
-          </div>
-        ) : (
-          <ExpenseTable
-            expenses={expenses}
-            onExpenseClick={handleExpenseClick}
-            showEmployee={true}
-            employeeNames={employeeNames}
-          />
-        )}
+        <Dialog open={!!selectedExpense} onOpenChange={(open) => !open && setSelectedExpense(null)}>
+          <DialogContent className="bg-gray-950 border-gray-800 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Review Expense</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Review the expense details and approve or reject
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedExpense && (
+              <div className="space-y-6 pb-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-400">Employee</Label>
+                    <p className="text-white mt-1">
+                      {selectedExpense.submittedBy?.name || selectedExpense.submittedBy?.email || 'Unknown'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400">Date</Label>
+                    <p className="text-white mt-1">
+                      {new Date(selectedExpense.submissionDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400">Category</Label>
+                    <p className="text-white mt-1">{selectedExpense.category}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-400">Amount</Label>
+                    <p className="text-white mt-1 font-semibold">
+                      {selectedExpense.companyCurrency}{' '}
+                      {parseFloat(selectedExpense.convertedAmount?.$numberDecimal || selectedExpense.convertedAmount || '0').toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-400">Original Amount</Label>
+                    <p className="text-white mt-1">
+                      {selectedExpense.originalCurrency}{' '}
+                      {parseFloat(selectedExpense.originalAmount?.$numberDecimal || selectedExpense.originalAmount || '0').toFixed(2)}
+                      {' '}(Rate: {parseFloat(selectedExpense.exchangeRate?.$numberDecimal || selectedExpense.exchangeRate || '1').toFixed(4)})
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-400">Description</Label>
+                    <p className="text-white mt-1">{selectedExpense.description}</p>
+                  </div>
+                  {selectedExpense.receiptUrl && (
+                    <div className="col-span-2">
+                      <Label className="text-gray-400">Receipt</Label>
+                      <div className="mt-2">
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_API_URL}${selectedExpense.receiptUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline"
+                        >
+                          View Receipt
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="comment">Comment (Optional)</Label>
+                  <Textarea
+                    id="comment"
+                    placeholder="Add a comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="bg-gray-900 border-gray-800 text-white min-h-[80px]"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedExpense(null)}
+                    className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-900"
+                    disabled={actionLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleAction('Rejected')}
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reject'}
+                  </Button>
+                  <Button
+                    onClick={() => handleAction('Approved')}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
-
-      <ApprovalModal
-        open={approvalOpen}
-        onOpenChange={setApprovalOpen}
-        expense={selectedExpense}
-        convertedAmount={convertedAmount}
-        companyCurrency={company?.default_currency}
-        onApprove={handleApprove}
-        onReject={handleReject}
-      />
     </div>
   );
 }

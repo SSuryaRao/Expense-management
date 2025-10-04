@@ -8,28 +8,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader as Loader2, TrendingUp } from 'lucide-react';
+import { Loader2, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, user, profile } = useAuth();
+  const { signIn, user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user && profile) {
-      if (profile.role === 'admin') {
+    if (user) {
+      if (user.role === 'Admin') {
         router.push('/admin');
-      } else if (profile.role === 'manager') {
+      } else if (user.role === 'Manager') {
         router.push('/manager/approvals');
       } else {
         router.push('/dashboard');
       }
     }
-  }, [user, profile, router]);
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +44,7 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Invalid credentials',
+        description: error.response?.data?.message || 'Invalid credentials',
         variant: 'destructive',
       });
     } finally {

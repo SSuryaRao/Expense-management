@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { simulateOCR } from '@/services/api';
 import { Upload, Loader as Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 type NewExpenseModalProps = {
   open: boolean;
@@ -31,6 +32,7 @@ type NewExpenseModalProps = {
     category: string;
     description: string;
     expense_date: string;
+    receipt: File;
   }) => Promise<void>;
   defaultCurrency: string;
 };
@@ -44,8 +46,10 @@ export function NewExpenseModal({
   onSubmit,
   defaultCurrency,
 }: NewExpenseModalProps) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     amount: '',
     currency: defaultCurrency,
@@ -57,6 +61,9 @@ export function NewExpenseModal({
   const handleOCRUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Store the receipt file
+    setReceiptFile(file);
 
     setOcrLoading(true);
     try {
@@ -77,6 +84,16 @@ export function NewExpenseModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!receiptFile) {
+      toast({
+        title: 'Receipt Required',
+        description: 'Please upload a receipt (image or PDF)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -86,6 +103,7 @@ export function NewExpenseModal({
         category: formData.category,
         description: formData.description,
         expense_date: formData.expense_date,
+        receipt: receiptFile,
       });
 
       setFormData({
@@ -95,6 +113,7 @@ export function NewExpenseModal({
         description: '',
         expense_date: new Date().toISOString().split('T')[0],
       });
+      setReceiptFile(null);
 
       onOpenChange(false);
     } catch (error) {
@@ -120,7 +139,7 @@ export function NewExpenseModal({
               type="file"
               id="receipt"
               className="hidden"
-              accept="image/*"
+              accept="image/*,application/pdf"
               onChange={handleOCRUpload}
               disabled={ocrLoading}
             />
@@ -134,8 +153,13 @@ export function NewExpenseModal({
                 <Upload className="h-8 w-8 text-gray-400" />
               )}
               <span className="text-sm text-gray-400">
-                {ocrLoading ? 'Processing receipt...' : 'Upload Receipt (OCR)'}
+                {ocrLoading ? 'Processing receipt...' : receiptFile ? `Uploaded: ${receiptFile.name}` : 'Upload Receipt (Image/PDF)'}
               </span>
+              {!receiptFile && (
+                <p className="text-xs text-gray-500 mt-2">
+                  OCR auto-fills for both images and PDFs
+                </p>
+              )}
             </label>
           </div>
 

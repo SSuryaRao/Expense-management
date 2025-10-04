@@ -28,9 +28,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { supabase, Profile } from '@/lib/supabase';
+import { Profile } from '@/lib/supabase';
 import { Plus, CreditCard as Edit, Loader as Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export function UsersTab() {
   const { profile: currentProfile } = useAuth();
@@ -54,17 +67,20 @@ export function UsersTab() {
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('company_id', currentProfile?.company_id)
-        .neq('role', 'admin')
-        .order('created_at', { ascending: false });
+      const { data } = await api.get('/users');
+      const filteredUsers = data.filter((u: any) => u.role !== 'Admin');
 
-      if (error) throw error;
+      // Map backend fields to frontend format
+      const mappedUsers = filteredUsers.map((u: any) => ({
+        ...u,
+        _id: u._id,
+        id: u._id, // Add id field for compatibility
+        manager_id: u.managerId,
+        role: u.role.toLowerCase(),
+      }));
 
-      setUsers(data || []);
-      setManagers(data?.filter((u) => u.role === 'manager') || []);
+      setUsers(mappedUsers || []);
+      setManagers(mappedUsers?.filter((u: any) => u.role === 'manager') || []);
     } catch (error) {
       console.error('Failed to load users:', error);
       toast({
@@ -104,39 +120,28 @@ export function UsersTab() {
 
     try {
       if (editUser) {
-        const updates: any = {
-          role: formData.role,
-          manager_id: formData.manager_id || null,
-        };
-
-        await supabase.from('profiles').update(updates).eq('id', editUser.id);
+        await api.put(`/users/${editUser._id}`, {
+          role: formData.role.charAt(0).toUpperCase() + formData.role.slice(1),
+          managerId: formData.manager_id || null,
+        });
 
         toast({
           title: 'Success',
           description: 'User updated successfully',
         });
       } else {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        await api.post('/users', {
+          name: formData.email.split('@')[0],
           email: formData.email,
           password: formData.password,
+          role: formData.role.charAt(0).toUpperCase() + formData.role.slice(1),
+          managerId: formData.manager_id || null,
         });
 
-        if (authError) throw authError;
-
-        if (authData.user) {
-          await supabase.from('profiles').insert({
-            id: authData.user.id,
-            company_id: currentProfile?.company_id,
-            email: formData.email,
-            role: formData.role,
-            manager_id: formData.manager_id || null,
-          });
-
-          toast({
-            title: 'Success',
-            description: 'User created successfully',
-          });
-        }
+        toast({
+          title: 'Success',
+          description: 'User created successfully',
+        });
       }
 
       setModalOpen(false);
@@ -145,7 +150,7 @@ export function UsersTab() {
       console.error('Failed to save user:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save user',
+        description: error.response?.data?.message || 'Failed to save user',
         variant: 'destructive',
       });
     } finally {
@@ -196,7 +201,7 @@ export function UsersTab() {
             ) : (
               users.map((user) => (
                 <TableRow
-                  key={user.id}
+                  key={user._id}
                   className="border-gray-800 hover:bg-gray-900"
                 >
                   <TableCell className="text-gray-300">{user.email}</TableCell>
@@ -213,7 +218,7 @@ export function UsersTab() {
                   </TableCell>
                   <TableCell className="text-gray-300">
                     {user.manager_id
-                      ? managers.find((m) => m.id === user.manager_id)?.email || 'Unknown'
+                      ? managers.find((m) => m._id === user.manager_id)?.email || 'Unknown'
                       : '-'}
                   </TableCell>
                   <TableCell>
@@ -278,7 +283,7 @@ export function UsersTab() {
               <Select
                 value={formData.role}
                 onValueChange={(value: 'employee' | 'manager') =>
-                  setFormData({ ...formData, role: value })
+                  setFormData({ ...formData, role: value, manager_id: value === 'manager' ? '' : formData.manager_id })
                 }
               >
                 <SelectTrigger className="bg-gray-900 border-gray-800 text-white">
@@ -295,16 +300,16 @@ export function UsersTab() {
               <div className="space-y-2">
                 <Label htmlFor="manager">Manager (Optional)</Label>
                 <Select
-                  value={formData.manager_id}
-                  onValueChange={(value) => setFormData({ ...formData, manager_id: value })}
+                  value={formData.manager_id || 'none'}
+                  onValueChange={(value) => setFormData({ ...formData, manager_id: value === 'none' ? '' : value })}
                 >
                   <SelectTrigger className="bg-gray-900 border-gray-800 text-white">
                     <SelectValue placeholder="Select manager" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-900 border-gray-800 text-white">
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
+                      <SelectItem key={manager._id} value={manager._id}>
                         {manager.email}
                       </SelectItem>
                     ))}

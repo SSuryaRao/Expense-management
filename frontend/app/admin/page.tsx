@@ -20,13 +20,13 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (profile && profile.role !== 'admin') {
-      if (profile.role === 'employee') {
+    if (user && user.role !== 'Admin') {
+      if (user.role === 'Employee') {
         router.push('/dashboard');
-      } else if (profile.role === 'manager') {
+      } else if (user.role === 'Manager') {
         router.push('/manager/approvals');
       }
-    } else if (profile) {
+    } else if (user) {
       setLoading(false);
     }
   }, [user, profile, router]);

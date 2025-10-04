@@ -1,4 +1,46 @@
 const User = require('../models/User');
+const Company = require('../models/Company');
+
+// @desc    Get current logged in user with company info
+// @route   GET /api/users/me
+// @access  Private
+exports.getMe = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password');
+        const company = await Company.findById(user.companyId);
+
+        res.status(200).json({
+            user,
+            company
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Get user by ID
+// @route   GET /api/users/:id
+// @access  Private
+exports.getUserById = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Ensure users can only access their own data or users in their company
+        if (user.companyId.toString() !== req.user.companyId.toString()) {
+            return res.status(403).json({ message: 'Not authorized to access this user' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
 
 // @desc    Admin creates a new user (Employee or Manager)
 // @route   POST /api/users
