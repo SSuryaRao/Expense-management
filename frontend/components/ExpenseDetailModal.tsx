@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Expense, ExpenseApproval } from '@/lib/supabase';
+import { Expense, ExpenseApproval } from '@/lib/types';
 import { Check, X, Clock } from 'lucide-react';
 
 type ExpenseDetailModalProps = {

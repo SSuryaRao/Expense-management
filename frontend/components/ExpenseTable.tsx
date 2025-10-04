@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Expense } from '@/lib/supabase';
+import { Expense } from '@/lib/types';
 
 type ExpenseTableProps<T extends Expense = Expense> = {
   expenses: T[];

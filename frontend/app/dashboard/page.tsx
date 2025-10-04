@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ExpenseTable } from '@/components/ExpenseTable';
 import { NewExpenseModal } from '@/components/NewExpenseModal';
 import { ExpenseDetailModal } from '@/components/ExpenseDetailModal';
-import { Expense, ExpenseApproval } from '@/lib/supabase'; // Keep these types for now
+import { Expense, ExpenseApproval } from '@/lib/types';
 import { Plus, LogOut, Loader as Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';

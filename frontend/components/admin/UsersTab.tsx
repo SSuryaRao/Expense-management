@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Profile } from '@/lib/supabase';
+import { Profile } from '@/lib/types';
 import { Plus, CreditCard as Edit, Loader as Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
@@ -77,6 +77,7 @@ export function UsersTab() {
         ...u,
         _id: u._id,
         id: u._id, // Add id field for compatibility
+        name: u.name || u.email.split('@')[0],
         manager_id: u.managerId,
         role: u.role.toLowerCase(),
       }));
@@ -99,7 +100,7 @@ export function UsersTab() {
     if (user) {
       setEditUser(user);
       setFormData({
-        name: user.name || '',
+        name: user.name,
         email: user.email,
         password: '',
         role: user.role as 'employee' | 'manager',
@@ -214,7 +215,7 @@ export function UsersTab() {
                   key={user._id}
                   className="border-gray-800 hover:bg-gray-900"
                 >
-                  <TableCell className="text-gray-300">{user.name || '-'}</TableCell>
+                  <TableCell className="text-gray-300">{user.name}</TableCell>
                   <TableCell className="text-gray-300">{user.email}</TableCell>
                   <TableCell>
                     <Badge

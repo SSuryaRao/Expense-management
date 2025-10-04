@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Expense } from '@/lib/supabase';
+import { Expense } from '@/lib/types';
 import { Loader as Loader2 } from 'lucide-react';
 
 type ApprovalModalProps = {
