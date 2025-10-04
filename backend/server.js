@@ -7,11 +7,15 @@ dotenv.config();
 
 const connectDB = require('./config/db'); // We'll create this next
 const { testGeminiConnection } = require('./services/geminiService');
+const { startCleanupTask } = require('./services/cleanupService');
 
 connectDB();
 
 // Test OpenAI API connection
 testGeminiConnection();
+
+// Start automatic file cleanup (deletes uploads older than 5 minutes)
+startCleanupTask();
 
 const app = require('./app'); // We will move the app logic to app.js for testing
 
