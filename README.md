@@ -223,9 +223,9 @@ You can test the system with these role-based accounts:
 ![Admin Workflow Config](./screenshots/workflow-config.png)
 -->
 
-*Screenshots will be added soon!*
+<!-- *Screenshots will be added soon!*
 
---- -->
+--- --> 
 
 ## <span style="color:#6c5ce7;">🚀 Future Enhancements</span>
 
@@ -244,7 +244,7 @@ You can test the system with these role-based accounts:
 
 <div align="center">
 
-| Name                | Role                     | GitHub                                           |
+| Name                | Role                     |                                           
 |---------------------|--------------------------|--------------------------------------------------|
 | **S Surya Rao**     | Full Stack Developer     | 
 | **Subham Kumar Sahu** | Backend Developer        | 
