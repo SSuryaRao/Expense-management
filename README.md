@@ -240,7 +240,7 @@ You can test the system with these role-based accounts:
 
 ---
 
-## <span style="color:#6c5ce7;">👥 Team</span>
+<!-- ## <span style="color:#6c5ce7;">👥 Team</span>
 
 <div align="center">
 
@@ -254,7 +254,7 @@ You can test the system with these role-based accounts:
 </div>
 
 
----
+--- -->
 
 ## <span style="color:#6c5ce7;">🙏 Acknowledgements</span>
 

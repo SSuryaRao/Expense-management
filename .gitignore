@@ -35,3 +35,6 @@ frontend/coverage
 backend/build
 backend/dist
 backend/coverage
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
