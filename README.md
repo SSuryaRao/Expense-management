@@ -246,10 +246,10 @@ You can test the system with these role-based accounts:
 
 | Name                | Role                     | GitHub                                           |
 |---------------------|--------------------------|--------------------------------------------------|
-| **Surya S Rao**     | Full Stack Developer     | [@SSuryaRao](https://github.com/SSuryaRao)      |
-| **[Team Member 2]** | Backend Developer        | [@username](https://github.com/username)        |
-| **[Team Member 3]** | Frontend Developer       | [@username](https://github.com/username)        |
-| **[Team Member 4]** | UI/UX Designer           | [@username](https://github.com/username)        |
+| **S Surya Rao**     | Full Stack Developer     | 
+| **Subham Kumar Sahu** | Backend Developer        | 
+| **Manab Behera** | Frontend Developer       | 
+| **Suvam Mishra** | UI/UX Designer           |
 
 </div>
 
