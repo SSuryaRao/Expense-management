@@ -3,8 +3,10 @@
 
 export type Profile = {
   id: string;
+  _id: string;
   company_id: string;
   email: string;
+  name?: string;
   role: 'admin' | 'manager' | 'employee';
   manager_id: string | null;
   created_at: string;
