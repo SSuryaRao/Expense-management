@@ -53,9 +53,11 @@ export function UsersTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
+    name: '',
     email: '',
     password: '',
     role: 'employee' as 'employee' | 'manager',
+    jobTitle: '',
     manager_id: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -97,17 +99,21 @@ export function UsersTab() {
     if (user) {
       setEditUser(user);
       setFormData({
+        name: user.name || '',
         email: user.email,
         password: '',
         role: user.role as 'employee' | 'manager',
+        jobTitle: (user as any).jobTitle || '',
         manager_id: user.manager_id || '',
       });
     } else {
       setEditUser(null);
       setFormData({
+        name: '',
         email: '',
         password: '',
         role: 'employee',
+        jobTitle: '',
         manager_id: '',
       });
     }
@@ -122,6 +128,7 @@ export function UsersTab() {
       if (editUser) {
         await api.put(`/users/${editUser._id}`, {
           role: formData.role.charAt(0).toUpperCase() + formData.role.slice(1),
+          jobTitle: formData.jobTitle,
           managerId: formData.manager_id || null,
         });
 
@@ -131,10 +138,11 @@ export function UsersTab() {
         });
       } else {
         await api.post('/users', {
-          name: formData.email.split('@')[0],
+          name: formData.name || formData.email.split('@')[0],
           email: formData.email,
           password: formData.password,
           role: formData.role.charAt(0).toUpperCase() + formData.role.slice(1),
+          jobTitle: formData.jobTitle,
           managerId: formData.manager_id || null,
         });
 
@@ -185,8 +193,10 @@ export function UsersTab() {
         <Table>
           <TableHeader>
             <TableRow className="border-gray-800 hover:bg-gray-900">
+              <TableHead className="text-gray-400">Name</TableHead>
               <TableHead className="text-gray-400">Email</TableHead>
               <TableHead className="text-gray-400">Role</TableHead>
+              <TableHead className="text-gray-400">Job Title</TableHead>
               <TableHead className="text-gray-400">Manager</TableHead>
               <TableHead className="text-gray-400">Actions</TableHead>
             </TableRow>
@@ -194,7 +204,7 @@ export function UsersTab() {
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                   No users found
                 </TableCell>
               </TableRow>
@@ -204,6 +214,7 @@ export function UsersTab() {
                   key={user._id}
                   className="border-gray-800 hover:bg-gray-900"
                 >
+                  <TableCell className="text-gray-300">{user.name || '-'}</TableCell>
                   <TableCell className="text-gray-300">{user.email}</TableCell>
                   <TableCell>
                     <Badge
@@ -215,6 +226,9 @@ export function UsersTab() {
                     >
                       {user.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-gray-300">
+                    {(user as any).jobTitle || '-'}
                   </TableCell>
                   <TableCell className="text-gray-300">
                     {user.manager_id
@@ -251,6 +265,19 @@ export function UsersTab() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., John Doe"
+                required
+                className="bg-gray-900 border-gray-800 text-white"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -294,6 +321,24 @@ export function UsersTab() {
                   <SelectItem value="manager">Manager</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-400">
+                Manager role is required for approval workflows
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="jobTitle">Job Title (Optional)</Label>
+              <Input
+                id="jobTitle"
+                type="text"
+                value={formData.jobTitle}
+                onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
+                placeholder="e.g., CFO, Director, Finance Manager"
+                className="bg-gray-900 border-gray-800 text-white"
+              />
+              <p className="text-xs text-gray-400">
+                For display purposes (CFO, Director, Finance Manager, etc.)
+              </p>
             </div>
 
             {formData.role === 'employee' && (

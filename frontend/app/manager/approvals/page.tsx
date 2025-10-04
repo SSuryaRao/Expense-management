@@ -225,6 +225,81 @@ export default function ManagerApprovalsPage() {
 
             {selectedExpense && (
               <div className="space-y-6 pb-4">
+                {/* Workflow Step Info */}
+                {selectedExpense.pendingStepType && (
+                  <div className="bg-blue-950 border border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-5 w-5 text-blue-400" />
+                      <span className="font-semibold text-blue-300">
+                        {selectedExpense.pendingStepType === 'manager_pre_approval'
+                          ? 'Manager Pre-Approval Required'
+                          : `Current Step: ${selectedExpense.pendingStepName}`}
+                      </span>
+                    </div>
+                    {selectedExpense.pendingStepType === 'manager_pre_approval' ? (
+                      <p className="text-sm text-blue-200">
+                        As the submitter's manager, your approval is required before this expense
+                        proceeds to the workflow steps.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-blue-200">
+                        You are an approver for this step. Your approval is needed to proceed.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Approval History */}
+                {selectedExpense.approvalHistory && selectedExpense.approvalHistory.length > 0 && (
+                  <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                    <Label className="text-gray-400 mb-3 block">Approval History</Label>
+                    <div className="space-y-2">
+                      {selectedExpense.approvalHistory.map((history: any, index: number) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 text-sm p-2 bg-gray-950 rounded"
+                        >
+                          <div
+                            className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                              history.action === 'Approved' ? 'bg-green-600' : 'bg-red-600'
+                            }`}
+                          >
+                            {history.action === 'Approved' ? (
+                              <CheckCircle className="h-4 w-4 text-white" />
+                            ) : (
+                              <X className="h-4 w-4 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-medium">{history.approverName}</span>
+                              <span
+                                className={`text-xs ${
+                                  history.action === 'Approved' ? 'text-green-400' : 'text-red-400'
+                                }`}
+                              >
+                                {history.action}
+                              </span>
+                              {history.isManagerApproval && (
+                                <span className="text-xs text-blue-400">(Manager Pre-Approval)</span>
+                              )}
+                              {history.stepLevel && (
+                                <span className="text-xs text-gray-400">(Step {history.stepLevel})</span>
+                              )}
+                            </div>
+                            {history.comment && (
+                              <p className="text-gray-400 text-xs mt-1">{history.comment}</p>
+                            )}
+                            <p className="text-gray-500 text-xs mt-1">
+                              {new Date(history.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-400">Employee</Label>

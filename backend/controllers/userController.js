@@ -46,7 +46,7 @@ exports.getUserById = async (req, res) => {
 // @route   POST /api/users
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
-    const { name, email, password, role, managerId } = req.body;
+    const { name, email, password, role, jobTitle, managerId } = req.body;
 
     // The new user will belong to the same company as the admin creating them.
     const companyId = req.user.companyId;
@@ -62,6 +62,7 @@ exports.createUser = async (req, res) => {
             email,
             password,
             role: role || 'Employee', // Default to Employee if not specified
+            jobTitle: jobTitle || '', // Job title like 'CFO', 'Director', etc.
             companyId,
             managerId: managerId || null, // Optional manager assignment
         });
@@ -72,6 +73,7 @@ exports.createUser = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            jobTitle: user.jobTitle,
             managerId: user.managerId
         });
 
@@ -95,12 +97,12 @@ exports.getUsersInCompany = async (req, res) => {
 };
 
 
-// @desc    Admin updates a user's role or manager
+// @desc    Admin updates a user's role, job title, or manager
 // @route   PUT /api/users/:id
 // @access  Private/Admin
 exports.updateUser = async (req, res) => {
-    const { role, managerId } = req.body;
-    
+    const { role, jobTitle, managerId } = req.body;
+
     try {
         const user = await User.findById(req.params.id);
 
@@ -111,15 +113,17 @@ exports.updateUser = async (req, res) => {
             }
 
             user.role = role || user.role;
+            user.jobTitle = jobTitle !== undefined ? jobTitle : user.jobTitle;
             user.managerId = managerId !== undefined ? managerId : user.managerId;
 
             const updatedUser = await user.save();
-            
+
             res.status(200).json({
                 _id: updatedUser._id,
                 name: updatedUser.name,
                 email: updatedUser.email,
                 role: updatedUser.role,
+                jobTitle: updatedUser.jobTitle,
                 managerId: updatedUser.managerId,
             });
 

@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
     role: { type: String, enum: ['Employee', 'Manager', 'Admin'], default: 'Employee' },
+    jobTitle: { type: String, default: '' }, // e.g., 'CFO', 'Director', 'Finance Manager', 'Senior Accountant'
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
