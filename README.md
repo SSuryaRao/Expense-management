@@ -211,7 +211,7 @@ You can test the system with these role-based accounts:
 
 ---
 
-## <span style="color:#6c5ce7;">📸 Screenshots</span>
+<!-- ## <span style="color:#6c5ce7;">📸 Screenshots</span>
 
 <!-- Add your screenshots here -->
 <!--
@@ -225,7 +225,7 @@ You can test the system with these role-based accounts:
 
 *Screenshots will be added soon!*
 
----
+--- -->
 
 ## <span style="color:#6c5ce7;">🚀 Future Enhancements</span>
 
@@ -253,7 +253,6 @@ You can test the system with these role-based accounts:
 
 </div>
 
-*Update team details as needed*
 
 ---
 
