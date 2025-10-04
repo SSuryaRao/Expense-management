@@ -15,7 +15,17 @@ exports.processReceipt = async (req, res) => {
         // Perform OCR
         const extractedData = await performOCR(filePath, mimeType);
 
-        res.status(200).json(extractedData);
+        // Add metadata about processing
+        const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+        const response = {
+            ...extractedData,
+            metadata: {
+                processedByAI: extractedData.processedByAI || false,
+                processingMethod: extractedData.processedByAI ? `OpenAI ${modelName}` : 'Regex Parsing'
+            }
+        };
+
+        res.status(200).json(response);
     } catch (error) {
         console.error('OCR Controller Error:', error);
         res.status(500).json({

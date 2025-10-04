@@ -1,10 +1,17 @@
 // server.js
 const express = require('express');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db'); // We'll create this next
 
+// Load environment variables FIRST
 dotenv.config();
+
+const connectDB = require('./config/db'); // We'll create this next
+const { testGeminiConnection } = require('./services/geminiService');
+
 connectDB();
+
+// Test OpenAI API connection
+testGeminiConnection();
 
 const app = require('./app'); // We will move the app logic to app.js for testing
 

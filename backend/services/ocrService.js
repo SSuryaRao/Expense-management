@@ -2,6 +2,7 @@ const { createWorker } = require('tesseract.js');
 const PDFParser = require('pdf2json');
 const fs = require('fs');
 const path = require('path');
+const { processWithGemini } = require('./geminiService');
 
 /**
  * Perform OCR on an uploaded file (image or PDF)
@@ -23,8 +24,16 @@ async function performOCR(filePath, mimeType) {
 
         console.log('OCR Extracted Text:', text);
 
-        // Parse the extracted text
-        const parsed = parseReceiptText(text);
+        // Process extracted text with Gemini AI for better accuracy
+        let parsed;
+        try {
+            parsed = await processWithGemini(text);
+            console.log('Gemini Processed Data:', parsed);
+        } catch (geminiError) {
+            console.error('Gemini processing failed, falling back to regex parsing:', geminiError);
+            // Fallback to basic regex parsing if Gemini fails
+            parsed = parseReceiptText(text);
+        }
 
         return parsed;
     } catch (error) {
